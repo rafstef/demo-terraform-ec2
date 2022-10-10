@@ -40,21 +40,42 @@ data "aws_ami" "ubuntu" {
 
 
 module "frontend_ec2" {
+  count = "${lookup(local.backend_instance_count, terraform.workspace)}"
   source  = "terraform-aws-modules/ec2-instance/aws"
   version = "~> 4.1.1"
 
-  name = "demo-terraform-ec2-frontend-${lookup(local.env, terraform.workspace)}"
+  name = "${lookup(local.resource_prefix, terraform.workspace)}-frontend-${lookup(local.env, terraform.workspace)}-${count.index}"
 
   ami                    =  data.aws_ami.ubuntu.id
-  instance_type          = "t3.medium"
+  instance_type          = "t3.micro"
   key_name               = "cis-italy"
   monitoring             = true
-  vpc_security_group_ids = []
-  subnet_id              = data.terraform_remote_state.networking.outputs.private_subnets[0]
+  vpc_security_group_ids = [data.terraform_remote_state.networking.outputs.security_group]
+  subnet_id              = data.terraform_remote_state.networking.outputs.public_subnets[count.index]
 
   tags = {
     Terraform   = "true"
-    Environment = "dev"
+    Environment = "${lookup(local.env, terraform.workspace)}"
+  }
+}
+
+module "backend_ec2" {
+  count = "${lookup(local.backend_instance_count, terraform.workspace)}"
+  source  = "terraform-aws-modules/ec2-instance/aws"
+  version = "~> 4.1.1"
+
+  name = "${lookup(local.resource_prefix, terraform.workspace)}-backend-${lookup(local.env, terraform.workspace)}-${count.index}"
+
+  ami                    =  data.aws_ami.ubuntu.id
+  instance_type          = "t3.micro"
+  key_name               = "cis-italy"
+  monitoring             = true
+  vpc_security_group_ids = [data.terraform_remote_state.networking.outputs.security_group]
+  subnet_id              = data.terraform_remote_state.networking.outputs.private_subnets[count.index]
+
+  tags = {
+    Terraform   = "true"
+    Environment = "${lookup(local.env, terraform.workspace)}"
   }
 }
 
